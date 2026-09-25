@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>College Notice Assistant</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <!-- PDF.js for PDF text extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Tesseract.js for OCR on images -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+</head>
+<body>
+  <!-- ===== TOP NAV ===== -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="nav-icon">🎓</span>
+      <span class="nav-title">College Notice Assistant</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="nav-btn" data-page="analyze" onclick="showPage('analyze')">Analyze Notice</button>
+      <button class="nav-btn" data-page="profile" onclick="showPage('profile')">My Profile</button>
+      <button class="nav-btn" data-page="settings" onclick="showPage('settings')">Settings</button>
+    </div>
+    <button class="hamburger" id="hamburger" onclick="toggleMobileNav()">☰</button>
+  </nav>
+  <div class="mobile-nav" id="mobileNav">
+    <button onclick="showPage('dashboard');toggleMobileNav()">📊 Dashboard</button>
+    <button onclick="showPage('analyze');toggleMobileNav()">🔍 Analyze Notice</button>
+    <button onclick="showPage('profile');toggleMobileNav()">👤 My Profile</button>
+    <button onclick="showPage('settings');toggleMobileNav()">⚙️ Settings</button>
+  </div>
+
+  <!-- ===== PAGES ===== -->
+  <main class="main-container">
+
+    <!-- DASHBOARD PAGE -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h1>📊 Dashboard</h1>
+        <p class="page-subtitle">Your personalized notice summary and action items</p>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="stats-bar" id="statsBar"></div>
+
+      <!-- Demo mode banner -->
+      <div class="demo-banner" id="demoBanner" style="display:none;">
+        <span>🧪 <strong>Demo Mode</strong> — No AI API key configured. Sample notices are loaded. <a href="#" onclick="showPage('settings')">Add your OpenAI key</a> to analyze real notices.</span>
+      </div>
+
+      <!-- Dashboard filters -->
+      <div class="filter-bar">
+        <select id="dashFilterPriority" onchange="renderDashboard()">
+          <option value="">All Priorities</option>
+          <option value="CRITICAL">🔴 Critical</option>
+          <option value="HIGH">🟠 High</option>
+          <option value="MEDIUM">🟡 Medium</option>
+          <option value="LOW">🟢 Low</option>
+        </select>
+        <select id="dashFilterStatus" onchange="renderDashboard()">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="overdue">Overdue</option>
+          <option value="completed">Completed</option>
+        </select>
+        <input type="text" id="dashSearch" placeholder="Search tasks..." oninput="renderDashboard()" />
+      </div>
+
+      <!-- Task sections -->
+      <div id="dashboardContent"></div>
+    </div>
+
+    <!-- ANALYZE PAGE -->
+    <div id="page-analyze" class="page">
+      <div class="page-header">
+        <h1>🔍 Analyze a Notice</h1>
+        <p class="page-subtitle">Paste text, upload a PDF, or upload an image of a notice</p>
+      </div>
+
+      <div class="analyze-layout">
+        <!-- Input panel -->
+        <div class="input-panel card">
+          <h2>Notice Input</h2>
+
+          <!-- Input tabs -->
+          <div class="input-tabs">
+            <button class="tab-btn active" data-tab="text" onclick="switchTab('text')">✏️ Paste Text</button>
+            <button class="tab-btn" data-tab="pdf" onclick="switchTab('pdf')">📄 PDF</button>
+            <button class="tab-btn" data-tab="image" onclick="switchTab('image')">🖼️ Image</button>
+            <button class="tab-btn" data-tab="sample" onclick="switchTab('sample')">📋 Samples</button>
+          </div>
+
+          <!-- Text tab -->
+          <div id="tab-text" class="tab-content active">
+            <textarea id="noticeText" placeholder="Paste the full text of the college notice here..." rows="14"></textarea>
+          </div>
+
+          <!-- PDF tab -->
+          <div id="tab-pdf" class="tab-content">
+            <div class="upload-zone" id="pdfDropZone" ondragover="handleDragOver(event)" ondrop="handleDrop(event,'pdf')" onclick="document.getElementById('pdfInput').click()">
+              <div class="upload-icon">📄</div>
+              <p>Drag & drop a PDF here, or click to browse</p>
+              <p class="upload-hint">Supported: PDF files up to 10MB</p>
+              <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="handleFileSelect(event,'pdf')" />
+            </div>
+            <div id="pdfStatus" class="upload-status"></div>
+          </div>
+
+          <!-- Image tab -->
+          <div id="tab-image" class="tab-content">
+            <div class="upload-zone" id="imgDropZone" ondragover="handleDragOver(event)" ondrop="handleDrop(event,'image')" onclick="document.getElementById('imgInput').click()">
+              <div class="upload-icon">🖼️</div>
+              <p>Drag & drop an image here, or click to browse</p>
+              <p class="upload-hint">Supported: JPG, PNG, WEBP up to 5MB</p>
+              <input type="file" id="imgInput" accept=".jpg,.jpeg,.png,.webp" style="display:none" onchange="handleFileSelect(event,'image')" />
+            </div>
+            <div id="imgStatus" class="upload-status"></div>
+            <div id="ocrProgress" style="display:none">
+              <div class="progress-bar"><div class="progress-fill" id="ocrProgressFill"></div></div>
+              <p class="progress-label" id="ocrProgressLabel">Starting OCR...</p>
+            </div>
+          </div>
+
+          <!-- Sample tab -->
+          <div id="tab-sample" class="tab-content">
+            <p class="sample-hint">Select a sample notice to try the app:</p>
+            <div id="sampleList"></div>
+          </div>
+
+          <!-- Extracted text preview -->
+          <div id="extractedPreview" style="display:none" class="extracted-preview">
+            <div class="extracted-header">
+              <strong>Extracted Text Preview</strong>
+              <button class="btn-sm btn-ghost" onclick="clearExtracted()">✕ Clear</button>
+            </div>
+            <pre id="extractedText"></pre>
+          </div>
+
+          <!-- Analyze button -->
+          <div class="analyze-actions">
+            <input type="text" id="noticeTitle" placeholder="Notice title (optional)" class="title-input" />
+            <button class="btn btn-primary btn-large" onclick="analyzeNotice()" id="analyzeBtn">
+              <span id="analyzeBtnText">🔍 Analyze Notice</span>
+              <span id="analyzeBtnSpinner" class="spinner" style="display:none"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Results panel -->
+        <div id="resultsPanel" class="results-panel" style="display:none">
+          <div class="card">
+            <div class="results-header">
+              <h2 id="resultTitle">Analysis Results</h2>
+              <button class="btn btn-success" onclick="saveNotice()" id="saveBtn">💾 Save to Dashboard</button>
+            </div>
+
+            <!-- Summary section -->
+            <div class="result-section">
+              <h3>📋 Summary</h3>
+              <div id="resultSummary" class="result-box"></div>
+            </div>
+
+            <!-- Who is affected -->
+            <div class="result-section">
+              <h3>👥 Who Is Affected</h3>
+              <div id="resultAffected" class="result-box"></div>
+            </div>
+
+            <!-- Important dates -->
+            <div class="result-section">
+              <h3>📅 Important Dates</h3>
+              <div id="resultDates" class="result-box"></div>
+            </div>
+
+            <!-- Checklist -->
+            <div class="result-section">
+              <h3>✅ Action Checklist</h3>
+              <div id="resultChecklist"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div id="page-profile" class="page">
+      <div class="page-header">
+        <h1>👤 My Profile</h1>
+        <p class="page-subtitle">Tell us about yourself so we can personalize your task list</p>
+      </div>
+      <div class="card profile-card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="profileName">Full Name</label>
+            <input type="text" id="profileName" placeholder="e.g. Rahul Sharma" />
+          </div>
+          <div class="form-group">
+            <label for="profileYear">Year of Study</label>
+            <select id="profileYear">
+              <option value="">Select year</option>
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
+              <option value="5">5th Year</option>
+              <option value="pg1">PG 1st Year</option>
+              <option value="pg2">PG 2nd Year</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="profileDept">Department</label>
+            <input type="text" id="profileDept" placeholder="e.g. Computer Science" />
+          </div>
+          <div class="form-group">
+            <label for="profileSection">Section</label>
+            <input type="text" id="profileSection" placeholder="e.g. A, B, or None" />
+          </div>
+          <div class="form-group">
+            <label for="profileRollNo">Roll Number (optional)</label>
+            <input type="text" id="profileRollNo" placeholder="e.g. CS2021001" />
+          </div>
+          <div class="form-group">
+            <label for="profileEmail">Email (optional)</label>
+            <input type="email" id="profileEmail" placeholder="e.g. rahul@college.edu" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveProfile()">💾 Save Profile</button>
+        <div id="profileSaveMsg" class="save-msg" style="display:none">✅ Profile saved!</div>
+      </div>
+
+      <div class="card" style="margin-top:1.5rem">
+        <h3>How your profile is used</h3>
+        <ul class="info-list">
+          <li>Tasks from notices are filtered based on your year, department, and section.</li>
+          <li>If eligibility is uncertain, tasks are still shown with a <span class="badge badge-uncertain">Uncertain</span> flag.</li>
+          <li>Your profile is stored locally in your browser — never sent to any server.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <h1>⚙️ Settings</h1>
+        <p class="page-subtitle">Configure AI and app preferences</p>
+      </div>
+
+      <div class="card settings-card">
+        <h2>🤖 AI Configuration</h2>
+        <div class="form-group">
+          <label for="apiKey">OpenAI API Key</label>
+          <div class="api-key-row">
+            <input type="password" id="apiKey" placeholder="sk-..." />
+            <button class="btn btn-sm" onclick="toggleApiKeyVisibility()">👁</button>
+          </div>
+          <p class="field-hint">Your key is stored only in your browser's localStorage. It is never sent to any server other than OpenAI's API directly from your browser.</p>
+        </div>
+        <div class="form-group">
+          <label for="aiModel">AI Model</label>
+          <select id="aiModel">
+            <option value="gpt-4o">GPT-4o (Recommended)</option>
+            <option value="gpt-4o-mini">GPT-4o Mini (Faster, cheaper)</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+        <div id="settingsSaveMsg" class="save-msg" style="display:none">✅ Settings saved!</div>
+
+        <div class="demo-info">
+          <h3>🧪 About Demo Mode</h3>
+          <p>If no API key is configured, the app runs in Demo Mode using pre-analyzed sample notices. This lets you explore all features without any API key.</p>
+        </div>
+      </div>
+
+      <div class="card settings-card" style="margin-top:1.5rem">
+        <h2>🔔 Reminders</h2>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="reminderEnabled" />
+            Enable browser notifications for upcoming deadlines
+          </label>
+          <p class="field-hint">Requires notification permission from your browser. You will be prompted when enabling this.</p>
+        </div>
+        <div class="form-group" id="reminderDaysGroup">
+          <label for="reminderDays">Remind me how many days before a deadline?</label>
+          <select id="reminderDays">
+            <option value="1">1 day before</option>
+            <option value="2">2 days before</option>
+            <option value="3" selected>3 days before</option>
+            <option value="7">1 week before</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveReminderSettings()">💾 Save Reminder Settings</button>
+        <div id="reminderSaveMsg" class="save-msg" style="display:none">✅ Reminder preferences saved!</div>
+      </div>
+
+      <div class="card settings-card" style="margin-top:1.5rem">
+        <h2>🗑️ Data Management</h2>
+        <p>All data is stored in your browser's localStorage.</p>
+        <button class="btn btn-danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast notifications -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display:none">
+    <div class="loading-box">
+      <div class="spinner-large"></div>
+      <p id="loadingMessage">Analyzing notice...</p>
+    </div>
+  </div>
+
+  <!-- Confirmation modal -->
+  <div id="confirmModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <h3 id="confirmTitle">Confirm</h3>
+      <p id="confirmMessage"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/storage.js"></script>
+  <script src="assets/ai.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
